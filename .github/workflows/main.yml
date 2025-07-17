@@ -2,7 +2,7 @@ name: V2Ray Scraper Automation
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Run every 6 hours
+    - cron: '*/60 * * * *'
   workflow_dispatch:
 
 jobs:
