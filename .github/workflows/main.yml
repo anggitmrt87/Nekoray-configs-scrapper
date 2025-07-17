@@ -13,8 +13,6 @@ jobs:
     steps:
     - name: Checkout current repository
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
     - name: Set up Python 3.12
       uses: actions/setup-python@v4
@@ -54,16 +52,26 @@ jobs:
 
     - name: Push to target repository
       env:
-        TARGET_REPO: ${{ secrets.TARGET_REPO }}  # Format: username/repo-name
+        TARGET_REPO: ${{ secrets.TARGET_REPO }}
         GH_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
       run: |
-        # Clone target repository
-        git clone "https://$GH_TOKEN@github.com/$TARGET_REPO.git" target_repo
+        # Initialize or clone target repo
+        if [ -d "target_repo" ]; then
+          rm -rf target_repo
+        fi
         
-        # Clear target repo (except .git folder)
-        find target_repo -mindepth 1 -not -path 'target_repo/.git/*' -delete
+        git clone "https://$GH_TOKEN@github.com/$TARGET_REPO.git" target_repo || \
+        (mkdir -p target_repo && cd target_repo && git init && git remote add origin "https://$GH_TOKEN@github.com/$TARGET_REPO.git")
+        
+        # Prepare target directory
+        cd target_repo
+        git pull origin main || echo "No existing branch to pull"
+        
+        # Remove existing files (except .git)
+        find . -mindepth 1 -not -name '.git' -not -path './.git/*' -delete
         
         # Copy new files
+        cd ..
         if [ -d "output_sub" ]; then
           cp -r output_sub/* target_repo/
         else
@@ -76,7 +84,8 @@ jobs:
         git add .
         if ! git diff-index --quiet HEAD --; then
           git commit -m "Nekoray configs have been updated ✔ - $(TZ='Asia/Jakarta' date '+%Y-%m-%d %H:%M:%S')"
-          git push origin main
+          git branch -M main
+          git push -u origin main
         else
           echo "No changes to commit"
         fi
