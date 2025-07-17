@@ -1,36 +1,75 @@
-# This is a basic workflow to help you get started with Actions
+name: V2Ray Scraper Automation
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
+  schedule:
+    - cron: '0 */6 * * *'  # Run every 6 hours
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  scrape-and-push:
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    timeout-minutes: 30
+    
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+    - name: Checkout current repository
+      uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install telethon aiohttp
+
+    - name: Create config file
+      run: |
+        cat << EOF > config.py
+        API_ID = ${{ secrets.API_ID }}
+        API_HASH = "${{ secrets.API_HASH }}"
+        BOT_TOKEN = "${{ secrets.BOT_TOKEN }}"
+        USER_SESSION_STRING = "${{ secrets.USER_SESSION_STRING }}"
+        TELEGRAM_CHANNELS = ${{ secrets.TELEGRAM_CHANNELS }}
+        
+        APP_CONFIG = {
+            'config_folder': 'output_sub',
+            'auto_join': False,
+            'limit_messages': 200,
+            'request_delay': 1,
+            'admin_id': ${{ secrets.ADMIN_ID }}
+        }
+        EOF
+
+    - name: Run V2Ray Scraper
+      run: python main.py
+
+    - name: Prepare target repository workspace
+      run: |
+        mkdir ../Nekoray-configs
+        cd ../Nekoray-configs
+        git init
+        git remote add origin ${{ secrets.TARGET_REPO_URL }}
+        git fetch
+        git checkout -b main || git checkout main
+
+    - name: Copy and commit configs to target repo
+      run: |
+        # Copy all contents from subfolder to target repo
+        cp -r output_sub/* ../Nekoray-configs/
+        
+        cd ../Nekoray-configs
+        git add .
+        
+        # Only commit if there are changes
+        if git diff-index --quiet HEAD --; then
+          echo "No changes to commit"
+        else
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git commit -m "Nekoray configs have been updated ✔ - $(TZ='Asia/Jakarta' date '+%Y-%m-%d %H:%M:%S')"
+          git push https://${{ secrets.GITHUB_USERNAME }}:${{ secrets.TARGET_REPO_TOKEN }}@${TARGET_REPO_URL#https://} main
+        fi
+      env:
+        TARGET_REPO_URL: ${{ secrets.TARGET_REPO_URL }}
