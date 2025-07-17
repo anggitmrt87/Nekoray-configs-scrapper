@@ -2,7 +2,7 @@ name: V2Ray Scraper Automation
 
 on:
   schedule:
-    - cron: '*/60 * * * *'
+    - cron: '0 */6 * * *'  # Run every 6 hours
   workflow_dispatch:
 
 jobs:
@@ -13,6 +13,8 @@ jobs:
     steps:
     - name: Checkout current repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Set up Python 3.12
       uses: actions/setup-python@v4
@@ -26,7 +28,7 @@ jobs:
 
     - name: Create config file
       run: |
-        cat << EOF > config.py
+        cat << 'EOF' > config.py
         API_ID = ${{ secrets.API_ID }}
         API_HASH = "${{ secrets.API_HASH }}"
         BOT_TOKEN = "${{ secrets.BOT_TOKEN }}"
@@ -45,31 +47,36 @@ jobs:
     - name: Run V2Ray Scraper
       run: python main.py
 
-    - name: Prepare target repository workspace
+    - name: Configure Git
       run: |
-        mkdir ../Nekoray-configs
-        cd ../Nekoray-configs
-        git init
-        git remote add origin ${{ secrets.TARGET_REPO_URL }}
-        git fetch
-        git checkout -b main || git checkout main
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
 
-    - name: Copy and commit configs to target repo
-      run: |
-        # Copy all contents from subfolder to target repo
-        cp -r output_sub/* ../Nekoray-configs/
-        
-        cd ../Nekoray-configs
-        git add .
-        
-        # Only commit if there are changes
-        if git diff-index --quiet HEAD --; then
-          echo "No changes to commit"
-        else
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git commit -m "Nekoray configs have been updated ✔ - $(TZ='Asia/Jakarta' date '+%Y-%m-%d %H:%M:%S')"
-          git push https://${{ secrets.GITHUB_USERNAME }}:${{ secrets.TARGET_REPO_TOKEN }}@${TARGET_REPO_URL#https://} main
-        fi
+    - name: Push to target repository
       env:
-        TARGET_REPO_URL: ${{ secrets.TARGET_REPO_URL }}
+        TARGET_REPO: ${{ secrets.TARGET_REPO }}  # Format: username/repo-name
+        GH_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+      run: |
+        # Clone target repository
+        git clone "https://$GH_TOKEN@github.com/$TARGET_REPO.git" target_repo
+        
+        # Clear target repo (except .git folder)
+        find target_repo -mindepth 1 -not -path 'target_repo/.git/*' -delete
+        
+        # Copy new files
+        if [ -d "output_sub" ]; then
+          cp -r output_sub/* target_repo/
+        else
+          echo "Error: output_sub directory not found"
+          exit 1
+        fi
+        
+        # Commit and push
+        cd target_repo
+        git add .
+        if ! git diff-index --quiet HEAD --; then
+          git commit -m "Nekoray configs have been updated ✔ - $(TZ='Asia/Jakarta' date '+%Y-%m-%d %H:%M:%S')"
+          git push origin main
+        else
+          echo "No changes to commit"
+        fi
