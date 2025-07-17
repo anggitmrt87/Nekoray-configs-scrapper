@@ -36,7 +36,7 @@ jobs:
         APP_CONFIG = {
             'config_folder': 'output_sub',
             'auto_join': False,
-            'limit_messages': 200,
+            'limit_messages': 50,
             'request_delay': 1,
             'admin_id': ${{ secrets.ADMIN_ID }}
         }
