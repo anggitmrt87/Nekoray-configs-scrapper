@@ -27,19 +27,7 @@ jobs:
     - name: Create config file
       run: |
         cat << 'EOF' > config.py
-        API_ID = ${{ secrets.API_ID }}
-        API_HASH = "${{ secrets.API_HASH }}"
-        BOT_TOKEN = "${{ secrets.BOT_TOKEN }}"
-        USER_SESSION_STRING = "${{ secrets.USER_SESSION_STRING }}"
-        TELEGRAM_CHANNELS = ${{ secrets.TELEGRAM_CHANNELS }}
-        
-        APP_CONFIG = {
-            'config_folder': 'output_sub',
-            'auto_join': False,
-            'limit_messages': 50,
-            'request_delay': 1,
-            'admin_id': ${{ secrets.ADMIN_ID }}
-        }
+        ${{ secrets.FULL_CONFIG_PY }}
         EOF
 
     - name: Run V2Ray Scraper
@@ -47,8 +35,8 @@ jobs:
 
     - name: Configure Git
       run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
+        git config --global user.name "anggitmrt87"
+        git config --global user.email "jarbull87@gmail.com"
 
     - name: Push to target repository
       env:
